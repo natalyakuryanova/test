@@ -1,32 +1,18 @@
 @pytest.fixture()
-def make_folders():
-    return checkout("mkdir {} {} {} {}".format(data["folder_in"], data["folder_in"], data["folder_ext"], data["folder_ext2"]), "")
+def make_bad_arx():
+    checkout("cd {}; 7z a {}/arxbad -t{}".format(data["folder_in"], data["folder_out"], data["type"]), "Everything is Ok")
+    checkout("truncate -s 1 {}/arxbad.{}".format(data["folder_out"], data["type"]), "Everything is Ok")
+    yield "arxbad"
+    checkout("rm -f {}/arxbad.{}".format(data["folder_out"], data["type"]), "")
 
-@pytest.fixture()
-def clear_folders():
-    return checkout("rm -rf {}/* {}/* {}/* {}/*".format(data["folder_in"], data["folder_in"], data["folder_ext"], data["folder_ext2"]), "")
-@pytest.fixture()
-def make_files():
-    list_off_files = [ ]
-    for i in range(data["count"]):
-        filename = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-        if checkout("cd {}; dd if=/dev/urandom of={} bs={} count=1 iflag=fullblock".format(data["folder_in"], filename, data["bs"]), ""):
-            list_off_files.append(filename)
-    return list_off_files
 
-@pytest.fixture()
-def make_subfolder():
-    testfilename = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-    subfoldername = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-    if not checkout("cd {}; mkdir {}".format(data["folder_in"], subfoldername), ""):
-        return None, None
-    if not checkout("cd {}/{}; dd if=/dev/urandom of={} bs=1M count=1 iflag=fullblock".format(data["folder_in"], subfoldername, testfilename), ""):
-        return subfoldername, None
-    else:
-        return subfoldername, testfilename
+class TestNegative:
 
-@pytest.fixture(autouse=True)
-def print_time():
-    print("Start: {}".format(datetime.now().strftime("%H:%M:%S.%f")))
-    yield
-    print("Finish: {}".format(datetime.now().strftime("%H:%M:%S.%f")))
+    def test_step1(self, make_files, make_folders, clear_folders, make_bad_arx):
+        result1 = checkout_negative(f"cd {data['folder_out']};"
+                                    f" 7z e bad_arx.{data['arc_type']} -o{data['folder_ext']} -y", "ERRORS")
+        assert result1, "test1 FAIL"
+
+    def test_step2(self, make_folders, clear_folders, make_files, make_bad_arx):
+        assert checkout_negative(f"cd {data['folder_out']}; 7z t bad_arx.{data['arc_type']} ",  "ERRORS"),\
+            "test2 FAIL"
